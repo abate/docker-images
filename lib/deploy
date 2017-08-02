@@ -1,0 +1,67 @@
+#!/usr/bin/env sh
+
+
+log() {
+    prefix="deploy"
+
+    type="$1"
+    shift
+
+    case "$type" in
+        info);;
+        fatal)
+            echo "${prefix}: ${type}: $*"
+            exit 1
+            ;;
+        *)
+            log fatal "invalid log type '$type'"
+            ;;
+    esac
+
+    echo "${prefix}: ${type}: $*"
+}
+
+
+try() {
+    if command $* > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+if [ -z "$TRAVIS_BRANCH" ]; then
+    log fatal "deployment script not ran from build agent"
+fi
+
+
+log info "current branch: $TRAVIS_BRANCH"
+log info "current commit: $TRAVIS_COMMIT"
+log info "commit range: $TRAVIS_COMMIT_RANGE"
+
+
+if [ "$TRAVIS_BRANCH" != "master" ]; then
+    log info "building from push to master..."
+
+    if ! try git diff --name-only $TRAVIS_COMMIT_RANGE; then
+        log info "git-diff using TRAVIS_COMMIT_RANGE failed"
+        log info "falling back to single commit mode"
+
+        for file in $(git diff-tree --no-commit-id --name-only -r $TRAVIS_COMMIT); do
+            log info "filenameCaseA: $file"
+
+            case "$file" in
+                */images/*)
+                    echo "    is part of an image!"
+                    ;;
+            esac
+        done
+    else
+        for file in $(git diff --name-only $TRAVIS_COMMIT_RANGE); do
+            log info "filenameCaseB: $file"
+        done
+    fi
+else
+    log info "not on master branch, aborting"
+fi
